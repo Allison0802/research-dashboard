@@ -1,0 +1,24 @@
+{
+  "event_id": "123e4567-e89b-42d3-a456-426614174101",
+  "project_id": "example-climate-model",
+  "task_key": "summarize-results",
+  "event_type": "state_change",
+  "previous_state": "Active",
+  "new_state": "Completed",
+  "importance": "Normal",
+  "epistemic_status": "Observed",
+  "context": "An external producer created this synthetic event payload.",
+  "what_changed": "The synthetic result summary was completed.",
+  "source_agent": "example-agent",
+  "source_session": "example-session-002",
+  "observed_at": "2026-08-24T13:00:00+00:00",
+  "evidence": [
+    {
+      "evidence_type": "synthetic-record",
+      "locator": "examples/codex/synthetic-result-summary.md",
+      "authority": 1,
+      "observed_at": "2026-08-24T13:00:00+00:00",
+      "availability": "available"
+    }
+  ]
+}

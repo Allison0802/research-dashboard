@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Risk · Research Dashboard{% endblock %}
+
+{% block content %}
+  <p class="eyebrow">Risk record</p>
+  <div class="page-intro">
+    <div>
+      <h1>{{ risk.title or "Research risk" }}</h1>
+      <p class="lede">{{ risk.risk_type or "Unknown" }} · {{ risk.current_status or "Unknown" }}</p>
+    </div>
+    <span class="badge severity">{{ risk.severity or "Unspecified severity" }}</span>
+  </div>
+
+  <section class="dashboard-section" aria-labelledby="lifecycle-heading">
+    <div class="section-heading"><h2 id="lifecycle-heading">Lifecycle and status</h2></div>
+    <article class="card">
+      <dl class="detail-list">
+        <dt>Status</dt><dd>{{ risk.current_status or "Unknown" }}</dd>
+        <dt>Risk key</dt><dd>{{ risk.risk_key or "Unknown" }}</dd>
+        <dt>Project</dt><dd>{{ risk.project_id or "Unknown" }}</dd>
+        <dt>Fingerprint</dt><dd>{{ risk.fingerprint or "Unknown" }}</dd>
+      </dl>
+    </article>
+  </section>
+
+{% endblock %}

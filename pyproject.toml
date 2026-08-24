@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research-dashboard"
+version = "0.1.0"
+description = "Local semantic research operations dashboard"
+requires-python = ">=3.11"
+dependencies = ["fastapi", "jinja2", "pydantic>=2", "uvicorn"]
+
+[project.urls]
+Repository = "https://github.com/Allison0802/research-dashboard"
+
+[project.optional-dependencies]
+dev = ["httpx", "pytest"]
+
+[project.scripts]
+research-dashboard = "research_dashboard.cli:main"
+
+[tool.setuptools.package-data]
+research_dashboard = [
+    "schema.sql",
+    "templates/*.html",
+    "static/*.css",
+    "static/*.js",
+]

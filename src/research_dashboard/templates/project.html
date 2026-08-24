@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.project.name }} · Research Dashboard{% endblock %}
+
+{% macro event_list(events, empty_message) -%}
+  {% if events %}
+    <div class="card-grid">
+      {% for item in events %}
+        <article class="card">
+          <div class="card-heading">
+            <h3>{{ item.what_changed or item.task_key or "Recorded item" }}</h3>
+            {% if item.importance %}<span class="badge priority">{{ item.importance }}</span>{% endif %}
+          </div>
+          {% if item.task_key or item.workstream %}
+            <p class="card-meta">
+              {% if item.workstream %}<span>Workstream: {{ item.workstream }}</span>{% endif %}
+              {% if item.task_key %}<span>Task: {{ item.task_key }}</span>{% endif %}
+            </p>
+          {% endif %}
+          {% if item.context %}<p>{{ item.context }}</p>{% endif %}
+          {% if item.next_action and item.evidence_availability == "available" %}<p><strong>Next action:</strong> {{ item.next_action }}</p>{% endif %}
+          {% if item.evidence_availability %}<p class="card-meta">Evidence: {{ item.evidence_availability }}</p>{% endif %}
+          {% if item.provenance %}
+            <p class="card-meta">
+              {% if item.provenance.source_agent %}<span>Source: {{ item.provenance.source_agent }}</span>{% endif %}
+              {% if item.provenance.source_session %}<span>Session: {{ item.provenance.source_session }}</span>{% endif %}
+            </p>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="empty-state">{{ empty_message }}</p>
+  {% endif %}
+{%- endmacro %}
+
+{% macro roadmap_row(item, is_child=false) -%}
+  <li class="planning-row roadmap-row{% if is_child %} roadmap-child{% endif %}">
+    <div class="planning-row-main">
+      <div class="planning-row-heading">
+        <h3>{{ item.title }}</h3>
+        <span class="badge priority">{{ item.status }}</span>
+      </div>
+      {% if item.note %}<p class="planning-note">{{ item.note }}</p>{% endif %}
+      <p class="planning-provenance">
+        {% if item.source_plan_path %}Source: {{ item.source_plan_path }}{% elif item.source_key %}Source key: {{ item.source_key }}{% else %}Manual item{% endif %}
+      </p>
+    </div>
+  </li>
+{%- endmacro %}
+
+{% block content %}
+  <p class="eyebrow"><a href="{{ url_for('index') }}">Research portfolio</a> / project</p>
+  <div class="page-intro project-intro">
+    <div>
+      <h1>{{ project.project.name }}</h1>
+      <p class="lede">{{ project.project.domain }} · {{ project.project.lifecycle }}</p>
+    </div>
+  </div>
+
+  <section class="dashboard-section" aria-labelledby="project-brief-heading">
+    <div class="section-heading"><h2 id="project-brief-heading">Project brief</h2></div>
+    <article class="project-brief project-detail-brief">
+      <dl class="detail-list project-detail-ledger">
+        <dt>Project</dt><dd>{{ project.project.name }}</dd>
+        <dt>Domain</dt><dd>{{ project.project.domain }}</dd>
+        <dt>Lifecycle</dt><dd>{{ project.project.lifecycle }}</dd>
+        <dt>Context coverage</dt><dd>{{ project.context_coverage }}</dd>
+        <dt>Current status</dt><dd>{{ project.status }}</dd>
+        <dt>Now</dt><dd>{{ project.now_label or "No current evidence-backed work recorded." }}</dd>
+        <dt>Current focus</dt><dd>{{ project.current_focus.what_changed if project.current_focus else "No current evidence-backed work recorded." }}</dd>
+        <dt>Latest confirmed result</dt><dd>{{ project.latest_confirmed_result.what_changed if project.latest_confirmed_result else "No confirmed result recorded." }}</dd>
+        <dt>Immediate next action</dt><dd>{{ project.immediate_next_action or "No immediate action recorded." }}</dd>
+      </dl>
+      <p><strong>Current status:</strong> {{ project.status }}</p>
+      <p><strong>{{ project.plan_progress.label }}</strong></p>
+      <p>Evidence availability: {{ project.evidence_availability }}</p>
+      {% if project.governing_plan or project.project_roots %}
+        <nav class="project-links" aria-label="Registered resources for {{ project.project.name }}">
+          {% if project.governing_plan %}
+            <a href="{{ project.governing_plan.path|registered_path_uri }}">Governing plan</a>
+          {% endif %}
+          {% for root_path in project.project_roots %}
+            <a href="{{ root_path|registered_path_uri }}">Project root{% if project.project_roots|length > 1 %} {{ loop.index }}{% endif %}</a>
+          {% endfor %}
+        </nav>
+      {% endif %}
+    </article>
+  </section>
+
+  <section id="planning" class="dashboard-section planning-section" aria-labelledby="planning-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="planning-heading">Planning</h2>
+        <p class="muted">Manual working plan; evidence-backed project state remains below.</p>
+      </div>
+    </div>
+
+    {% if project.governing_plan %}
+      <p class="planning-source"><a href="{{ project.governing_plan.path|registered_path_uri }}">Source plan</a></p>
+    {% endif %}
+
+    {% if pending_proposal_batches %}
+      <article class="planning-sync-banner" aria-label="Pending plan changes">
+        <p><strong>Plan changed — {{ plan_sync.pending_proposal_count }} proposed roadmap updates await CLI review</strong></p>
+        {% for batch in pending_proposal_batches %}
+          <div>
+            <ul class="planning-list">
+              {% for proposal in batch.proposals %}
+                <li>
+                  {% if proposal.operation == "add" %}
+                    Add roadmap item: {{ proposal.title }}
+                  {% elif proposal.operation == "remove" %}
+                    Remove roadmap item: {{ proposal.roadmap_item_id }}
+                  {% else %}
+                    Reorder roadmap items
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endfor %}
+      </article>
+    {% elif plan_sync.status == "ambiguous" %}
+      <article class="planning-sync-banner" aria-label="Plan change review">
+        <p><strong>Plan needs roadmap review</strong></p>
+      </article>
+    {% endif %}
+
+    <div class="planning-subsection">
+      <div class="planning-subheading">
+        <h3>Roadmap</h3>
+      </div>
+      {% if planning.roadmap %}
+        <ul class="planning-list">
+          {% for item in planning.roadmap if item.parent_item_id is none %}
+            {{ roadmap_row(item) }}
+            {% set children = planning.roadmap|selectattr("parent_item_id", "equalto", item.roadmap_item_id)|list %}
+            {% if children %}
+              <li class="roadmap-children-wrap">
+                <ul class="planning-list roadmap-children">
+                  {% for child in children %}{{ roadmap_row(child, true) }}{% endfor %}
+                </ul>
+              </li>
+            {% endif %}
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="empty-state">No manual roadmap items yet.</p>
+      {% endif %}
+    </div>
+
+    <div class="planning-subsection">
+      <div class="planning-subheading">
+        <h3>My TODO <span class="count">{{ planning.open_todo_count }}</span></h3>
+      </div>
+      {% if planning.open_todos %}
+        <ul class="planning-list">
+          {% for todo in planning.open_todos %}
+            <li class="planning-row todo-row">
+              <div class="planning-row-main">
+                <div class="planning-row-heading">
+                  <h3>{{ todo.title }}</h3>
+                </div>
+                <p class="planning-meta">{{ todo.priority }} priority{% if todo.due_date %} · Due {{ todo.due_date }}{% endif %}{% if todo.roadmap_item_id %} · Attached to roadmap{% endif %}</p>
+                {% if todo.note %}<p class="planning-note">{{ todo.note }}</p>{% endif %}
+                {% if todo.suggested_roadmap_item %}
+                  <p class="planning-note">Suggested roadmap: {{ todo.suggested_roadmap_item.title }}</p>
+                {% endif %}
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="empty-state">No open TODOs.</p>
+      {% endif %}
+    </div>
+
+    <details class="completed-todos">
+      <summary>Completed TODOs ({{ planning.completed_todos|length }})</summary>
+      {% if planning.completed_todos %}
+        <ul class="planning-list completed-todo-list">
+          {% for todo in planning.completed_todos %}
+            <li class="planning-row todo-row completed">
+              <div class="planning-row-main">
+                <div class="planning-row-heading">
+                  <h3>{{ todo.title }}</h3>
+                </div>
+                <p class="planning-meta">{{ todo.priority }} priority{% if todo.completed_at %} · Completed {{ todo.completed_at[:10] }}{% endif %}</p>
+                {% if todo.note %}<p class="planning-note">{{ todo.note }}</p>{% endif %}
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="empty-state">No completed TODOs.</p>
+      {% endif %}
+    </details>
+  </section>
+
+  <section class="dashboard-section" aria-labelledby="workstreams-heading">
+    <div class="section-heading"><h2 id="workstreams-heading">Current workstreams</h2></div>
+    {{ event_list(project.current_work, "No evidence-backed work is currently recorded as active.") }}
+    {% if project.workstream_states %}
+      <div class="card-grid workstream-states">
+        {% for state in project.workstream_states %}
+          <article class="card">
+            <h3>{{ state.task_key }}</h3>
+            <p class="card-meta">Workstream: {{ state.workstream or "Unassigned" }}</p>
+            <p><strong>State:</strong> {{ state.current_state or "State unavailable" }}</p>
+            {% if state.evidence_availability != "available" %}
+              <p class="muted">State evidence: {{ state.evidence_availability }}</p>
+            {% endif %}
+          </article>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="dashboard-section" aria-labelledby="executions-heading">
+    <div class="section-heading"><h2 id="executions-heading">Execution state</h2></div>
+    {% if project.executions %}
+      <div class="card-grid">
+        {% for execution in project.executions %}
+          <article class="card">
+            <h3>Execution {{ execution.execution_id }}</h3>
+            <p class="card-meta">Backend: {{ execution.backend }}</p>
+            <p><strong>State:</strong> {{ execution.current_state }}</p>
+            <p class="card-meta">Reference: {{ execution.external_id }}</p>
+            {% if execution.workstream or execution.task_key %}
+              <p class="card-meta">
+                {% if execution.workstream %}<span>Workstream: {{ execution.workstream }}</span>{% endif %}
+                {% if execution.task_key %}<span>Task: {{ execution.task_key }}</span>{% endif %}
+              </p>
+            {% endif %}
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty-state">No executions are recorded for this project.</p>
+    {% endif %}
+  </section>
+
+  <section class="dashboard-section" aria-labelledby="risks-heading">
+    <div class="section-heading"><h2 id="risks-heading">Decisions, blockers, and risks</h2></div>
+    {% if project.decisions_needed %}
+      <h3>Decisions needed</h3>
+      {{ event_list(project.decisions_needed, "") }}
+    {% endif %}
+    <h3>Blockers</h3>
+    {{ event_list(project.blockers, "No recorded blockers.") }}
+    <h3>Risks</h3>
+    {{ event_list(project.risks, "No recorded research or operational risks.") }}
+  </section>
+
+  <section class="dashboard-section" aria-labelledby="findings-heading">
+    <div class="section-heading"><h2 id="findings-heading">Recent findings</h2></div>
+    {% if project.latest_confirmed_result %}
+      {{ event_list([project.latest_confirmed_result], "") }}
+    {% else %}
+      <p class="empty-state">No confirmed findings are recorded.</p>
+    {% endif %}
+    {{ event_list(project.completed, "No evidence-backed completed work is recorded.") }}
+  </section>
+
+  <section class="dashboard-section" aria-labelledby="history-heading">
+    <div class="section-heading"><h2 id="history-heading">History and evidence</h2></div>
+    <details class="history-and-evidence">
+      <summary>Show recorded history and supporting evidence</summary>
+      <div class="history-content">
+        {% if project.next_work_uncertainty %}
+          <article class="card">
+            <p><strong>Next work is uncertain.</strong> The following current action records are not evidence-confirmed:</p>
+            {% for item in project.next_work_uncertainty %}
+              <p class="muted">{{ item.task_key or "Unassigned task" }}: evidence {{ item.evidence_availability }}</p>
+            {% endfor %}
+          </article>
+        {% endif %}
+        <h3>Recorded sequence</h3>
+        {{ event_list(project.timeline, "No recorded project changes are available.") }}
+        <h3>Evidence records</h3>
+        {% if project.evidence_records %}
+          <div class="card-grid">
+            {% for item in project.evidence_records %}
+              <article class="card">
+                <h3>{{ item.what_changed }}</h3>
+                {% if item.task_key %}<p class="card-meta">Task: {{ item.task_key }}</p>{% endif %}
+                <p>Epistemic status: {{ item.epistemic_status }}</p>
+                <p>Evidence status: {{ item.evidence_availability }}</p>
+                {% if item.evidence %}
+                  <ul>
+                    {% for evidence in item.evidence %}
+                      <li>{{ evidence.evidence_type }}: {{ evidence.locator }}{% if evidence.availability != "available" %} ({{ evidence.availability }}){% endif %}</li>
+                    {% endfor %}
+                  </ul>
+                {% elif item.evidence_availability == "unknown" %}
+                  <p class="muted">No supporting evidence is recorded; evidence status is unknown.</p>
+                {% endif %}
+                {% if item.evidence_availability == "unavailable" %}
+                  <p class="muted">Supporting evidence is unavailable; this state is not confirmed.</p>
+                {% elif item.evidence_availability == "unknown" %}
+                  <p class="muted">Supporting evidence is unknown; this state is not confirmed.</p>
+                {% endif %}
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-state">No evidence records are available.</p>
+        {% endif %}
+      </div>
+    </details>
+  </section>
+{% endblock %}

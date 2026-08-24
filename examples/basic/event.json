@@ -1,0 +1,25 @@
+{
+  "event_id": "123e4567-e89b-42d3-a456-426614174100",
+  "project_id": "example-climate-model",
+  "task_key": "prepare-baseline",
+  "event_type": "state_change",
+  "previous_state": "Waiting",
+  "new_state": "Active",
+  "importance": "Normal",
+  "epistemic_status": "Observed",
+  "context": "A synthetic baseline model review was completed.",
+  "what_changed": "The synthetic example is ready for active work.",
+  "next_action": "Run the synthetic baseline model.",
+  "source_agent": "example-agent",
+  "source_session": "example-session-001",
+  "observed_at": "2026-08-24T12:00:00+00:00",
+  "evidence": [
+    {
+      "evidence_type": "synthetic-record",
+      "locator": "examples/basic/synthetic-baseline-review.md",
+      "authority": 1,
+      "observed_at": "2026-08-24T12:00:00+00:00",
+      "availability": "available"
+    }
+  ]
+}

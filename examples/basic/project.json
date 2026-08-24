@@ -1,0 +1,7 @@
+{
+  "project_id": "example-climate-model",
+  "name": "Example Climate Model",
+  "domain": "Climate Science",
+  "lifecycle": "Active",
+  "update_horizon_minutes": 10080
+}

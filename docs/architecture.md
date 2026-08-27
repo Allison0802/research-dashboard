@@ -10,11 +10,13 @@ optional execution summaries in SQLite.
 ```text
 project registration
         ↓
-external event producer → validated semantic-event JSON → append-only ledger
-                                                        ↓
-                                             deterministic read models
-                                                        ↓
-                                              GET-only dashboard views
+external event producer → CLI or Python caller → canonical event writer
+                                                   ↓
+                              validation → writable SQLite preflight → append-only ledger
+                                                                         ↓
+                                                              deterministic read models
+                                                                         ↓
+                                                               GET-only dashboard views
 ```
 
 External producers retain write responsibility. The dashboard accepts their
@@ -25,7 +27,7 @@ browser routes.
 
 The checkout contains source, tests, and documentation. Runtime state is kept
 separately in the directory selected by `RESEARCH_DASHBOARD_HOME` (or the
-portable default supplied by the application). Runtime databases, logs,
+portable `~/.research-dashboard` default supplied by the application). Runtime databases, logs,
 backups, and environments are not source artifacts and are not committed.
 
 ## Core records and authority boundaries
@@ -49,10 +51,19 @@ The system keeps the following concerns separate:
 
 ## Semantic update path
 
-An authorized caller validates a semantic-event payload, appends it with its
-evidence, and then read-only queries derive the portfolio and project views.
-The browser presentation layer has GET routes only; mutation authority remains
-outside HTTP.
+An authorized caller submits a semantic-event payload through the canonical
+writer. The writer validates the payload, obtains the configured local
+database through `load_settings()`, verifies SQLite write availability with a
+short write transaction, and then delegates append-only persistence to the
+event ledger. It returns a six-field acceptance receipt: `accepted`,
+`event_id`, `sequence`, `status`, `current_state`, and `conflict`. An exact
+event replay is idempotent and returns the same receipt.
+
+The CLI passes the receipt through unchanged. Database errors are structured as
+either a transient busy condition, a non-writable database, or a non-transient
+generic database error; callers decide whether to retry. The browser
+presentation layer has GET routes only; mutation authority remains outside
+HTTP.
 
 Optional event provenance is recorded as source agent and session metadata.
 It is displayed only when the event actually carries it. The full field and

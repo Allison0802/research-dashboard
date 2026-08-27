@@ -16,6 +16,7 @@ from research_dashboard.plan_sync import plan_sync_status
 from research_dashboard.planning import list_roadmap_items, list_todos
 from research_dashboard.settings import load_settings
 from research_dashboard.state import changes_since_checkpoint, changes_since_last_review
+from research_dashboard.writer import DashboardWriteError
 
 
 EVENT = {
@@ -800,10 +801,74 @@ def test_event_add_accepts_file_and_returns_sequence_and_conflict(
 
     assert exit_code == 0
     assert read_json(captured) == {
+        "accepted": True,
         "event_id": EVENT["event_id"],
         "sequence": 1,
+        "status": "accepted",
+        "current_state": "Active",
         "conflict": False,
     }
+
+
+def test_event_add_prints_writer_receipt(monkeypatch, capsys, tmp_path):
+    monkeypatch.setenv("RESEARCH_DASHBOARD_HOME", str(tmp_path / "runtime"))
+    event_path = tmp_path / "event.json"
+    event_path.write_text(json.dumps(EVENT), encoding="utf-8")
+    receipt = {
+        "accepted": True,
+        "event_id": EVENT["event_id"],
+        "sequence": 1,
+        "status": "accepted",
+        "current_state": "Active",
+        "conflict": False,
+    }
+    monkeypatch.setattr(cli, "submit_event", lambda event: receipt, raising=False)
+
+    exit_code, captured = invoke(
+        monkeypatch, capsys, "event", "add", "--input", str(event_path)
+    )
+
+    assert exit_code == 0
+    assert read_json(captured) == receipt
+
+
+@pytest.mark.parametrize(
+    ("code", "transient"),
+    [
+        ("DASHBOARD_DATABASE_BUSY", True),
+        ("DASHBOARD_DATABASE_NOT_WRITABLE", False),
+    ],
+)
+def test_event_add_serializes_dashboard_write_error(
+    monkeypatch, capsys, tmp_path, code, transient
+):
+    monkeypatch.setenv("RESEARCH_DASHBOARD_HOME", str(tmp_path / "runtime"))
+    event_path = tmp_path / "event.json"
+    event_path.write_text(json.dumps(EVENT), encoding="utf-8")
+
+    def raise_write_error(event):
+        raise DashboardWriteError(code, "database is locked", transient=transient)
+
+    monkeypatch.setattr(cli, "submit_event", raise_write_error, raising=False)
+
+    exit_code, captured = invoke(
+        monkeypatch, capsys, "event", "add", "--input", str(event_path)
+    )
+
+    assert exit_code == 2
+    assert captured.err == (
+        json.dumps(
+            {
+                "error": {
+                    "code": code,
+                    "transient": transient,
+                    "message": "database is locked",
+                }
+            },
+            ensure_ascii=False,
+        )
+        + "\n"
+    )
 
 
 def test_event_add_accepts_agent_provenance_json(monkeypatch, capsys, tmp_path):

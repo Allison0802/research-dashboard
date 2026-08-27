@@ -5,6 +5,35 @@ Submit one JSON object through `research-dashboard event add --input FILE` or
 the Python API. Unknown fields are rejected, and string fields are trimmed
 before validation.
 
+## Canonical writer and receipt
+
+The canonical writer validates an event before opening the configured local
+database, performs a SQLite write preflight, and appends the event with its
+evidence. It returns exactly this acceptance receipt:
+
+```json
+{
+  "accepted": true,
+  "event_id": "<event UUID>",
+  "sequence": 1,
+  "status": "accepted",
+  "current_state": "Waiting",
+  "conflict": false
+}
+```
+
+`accepted` confirms the event was recorded; `sequence` is its ledger sequence;
+`status`, `current_state`, and `conflict` describe the resulting derived
+state. Replaying an identical event ID, payload, and evidence is idempotent:
+it returns the original receipt and adds neither another event nor another
+evidence row.
+
+The CLI prints this receipt as JSON. If the database is busy, read-only, or
+otherwise unavailable for persistence, it exits with status 2 and writes a
+JSON error envelope containing `error.code`, `error.transient`, and
+`error.message` to standard error. Busy is transient; non-writable and other
+database errors are not retried automatically.
+
 ## Event fields
 
 | Field | Required | Meaning |

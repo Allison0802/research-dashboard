@@ -18,6 +18,20 @@ python3 -m venv .venv
 Runtime state defaults to `~/.research-dashboard/`. Set
 `RESEARCH_DASHBOARD_HOME` to use a different runtime location.
 
+### Event writer receipts
+
+`research-dashboard event add` uses the canonical local writer. It validates
+the JSON event, checks that SQLite can accept a write, appends the event and
+its evidence, then prints one acceptance receipt with exactly `accepted`,
+`event_id`, `sequence`, `status`, `current_state`, and `conflict`. Replaying
+the exact same event ID and payload returns the original receipt without
+creating a second event.
+
+If SQLite cannot accept the write, the command exits with status 2 and writes
+a JSON error envelope to standard error. The envelope distinguishes a
+transient busy database from a non-writable database so callers can make an
+explicit retry decision.
+
 ## Getting started
 
 Add an arbitrary project explicitly, then submit a validated event:

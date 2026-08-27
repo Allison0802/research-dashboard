@@ -18,7 +18,6 @@ from .domain import (
     TodoAddOperation,
     TodoUpdateOperation,
 )
-from .events import ingest_event
 from .executions import list_executions, register_execution
 from .plan_sync import bootstrap_roadmap_from_governing_plan, create_proposal_batch
 from .planning import (
@@ -41,6 +40,7 @@ from .reviews import create_named_checkpoint, mark_reviewed
 from .risks import accept_risk, resolve_risk, transition_risk
 from .settings import load_settings
 from .state import portfolio_query
+from .writer import DashboardWriteError, submit_event
 
 
 def _json(value: Any) -> None:
@@ -357,6 +357,11 @@ def _run_command(args: argparse.Namespace) -> None:
         _json(str(create_snapshot(args.destination, settings)))
         return
 
+    if args.command == "event":
+        event = _read_event_input(args.input)
+        _json(submit_event(event))
+        return
+
     read_only = args.command == "portfolio"
     connection = connect_db(settings, read_only=read_only)
     try:
@@ -461,16 +466,6 @@ def _run_command(args: argparse.Namespace) -> None:
                     ],
                 }
             )
-        elif args.command == "event":
-            event = _read_event_input(args.input)
-            result = ingest_event(connection, event)
-            _json(
-                {
-                    "event_id": result["event"]["event_id"],
-                    "sequence": result["event"]["sequence"],
-                    "conflict": result["conflict"] is not None,
-                }
-            )
         elif args.command == "review":
             _json(mark_reviewed(connection, args.through_sequence))
         elif args.command == "risk":
@@ -516,6 +511,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         _run_command(args)
+    except DashboardWriteError as error:
+        print(
+            json.dumps(
+                {
+                    "error": {
+                        "code": error.code,
+                        "transient": error.transient,
+                        "message": str(error),
+                    }
+                },
+                ensure_ascii=False,
+            ),
+            file=sys.stderr,
+        )
+        return 2
     except Exception as error:
         print(f"error: {error}", file=sys.stderr)
         return 2

@@ -206,6 +206,12 @@ class RiskInput(_DomainModel):
     updated_at: AwareDatetime = Field(default_factory=_utc_now)
 
 
+class ProgressInput(_DomainModel):
+    current_step: str = Field(min_length=1)
+    purpose: str = Field(min_length=1)
+    next_step: str | None = None
+
+
 class SemanticEventInput(_DomainModel):
     event_id: UUID
     project_id: str = Field(min_length=1)
@@ -220,6 +226,7 @@ class SemanticEventInput(_DomainModel):
     epistemic_status: EpistemicStatus
     context: str = Field(min_length=1)
     what_changed: str = Field(min_length=1)
+    progress: ProgressInput | None = None
     cause: str | None = None
     impact: str | None = None
     next_action: str | None = None

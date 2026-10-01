@@ -28,7 +28,23 @@ REQUIRED_TABLES = {
     "todos",
     "roadmap_sync_state",
     "roadmap_proposal_batches",
+    "activity_inbox",
 }
+
+
+def test_upgrade_preserves_legacy_event_and_agent_provenance(tmp_path):
+    settings = Settings(tmp_path / "runtime")
+    settings.runtime_root.mkdir(parents=True)
+    old_schema = db.SCHEMA_PATH.read_text().replace("    progress_json TEXT,\n", "")
+    with sqlite3.connect(settings.database_path) as connection:
+        connection.executescript(old_schema)
+        connection.execute("INSERT INTO projects (project_id,name,domain,lifecycle,created_at,updated_at) VALUES ('study','Study','Any Domain','Active','2026-10-01','2026-10-01')")
+        connection.execute("INSERT INTO events (event_id,project_id,event_type,importance,epistemic_status,context,what_changed,source_agent,observed_at,ingested_at) VALUES ('legacy','study','note','Routine change','Observed','original context','original text','original-agent','2026-10-01T12:00:00+00:00','2026-10-01T12:00:00+00:00')")
+    connection = init_db(settings)
+    row = dict(connection.execute("SELECT sequence,what_changed,source_agent,progress_json FROM events").fetchone())
+    assert row == {"sequence": 1, "what_changed": "original text", "source_agent": "original-agent", "progress_json": None}
+    assert connection.execute("SELECT COUNT(*) FROM activity_inbox").fetchone()[0] == 0
+    connection.close()
 
 
 def test_init_db_creates_required_tables(tmp_path):

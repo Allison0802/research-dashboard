@@ -1,166 +1,89 @@
 {% extends "base.html" %}
-
+{% from "brief.html" import excerpt %}
+{% macro progress_lines(row) %}
+  <p class="project-brief-line project-activity-line"><strong>{{ {'latest': 'Latest recorded step', 'historical': 'Earlier recorded step'}[row.progress_kind] }}:</strong> {{ row.progress_brief.current_step|readable_text|truncate(260, false, '…') }}</p>
+  <p class="project-brief-line"><strong>Purpose (recorded):</strong> {{ row.progress_brief.purpose|readable_text }}</p>
+  <p class="project-brief-line project-now"><strong>Next step (recorded):</strong> {{ row.progress_brief.next_step|readable_text if row.progress_brief.next_step else 'Not recorded.' }}</p>
+  {% if row.progress_binding %}<p class="update-uncertain">{{ row.progress_binding }}</p>{% endif %}
+{% endmacro %}
 {% block title %}Research Dashboard{% endblock %}
-
-{% macro event_card(item, card_class='') -%}
-  <article class="card event-card {{ card_class }}">
-    <div class="card-heading">
-      <h3>{{ item.what_changed }}</h3>
-      <span class="badge priority">{{ item.importance }}</span>
-    </div>
-    <p class="card-meta">
-      {% if item.project_name %}<span>{{ item.project_name }}</span>{% else %}<span>Project: {{ item.project_id }}</span>{% endif %}
-      {% if item.risk_severity %}<span>Severity: {{ item.risk_severity }}</span>{% endif %}
-    </p>
-    {% if item.provenance %}
-      <p class="card-meta">
-        {% if item.provenance.source_agent %}<span>Source: {{ item.provenance.source_agent }}</span>{% endif %}
-        {% if item.provenance.source_session %}<span>Session: {{ item.provenance.source_session }}</span>{% endif %}
-      </p>
-    {% endif %}
-    {% if item.context %}<p class="event-context">{{ item.context }}</p>{% endif %}
-  </article>
-{%- endmacro %}
-
-{% macro project_brief(summary) -%}
-  {% set project = summary.project %}
-  {% set result = summary.latest_confirmed_result %}
-  {% set blocker_or_decision = summary.decision_needed or summary.primary_blocker %}
-  {% set progress = summary.planning_summary.roadmap_progress %}
-  {% set todo_count = summary.planning_summary.open_todo_count %}
-  <article class="project-brief" aria-labelledby="project-brief-{{ project.project_id }}">
-    <div class="project-brief-heading">
-      <div>
-        <h3 id="project-brief-{{ project.project_id }}"><a href="{{ url_for('project', project_id=project.project_id) }}">{{ project.name }}</a></h3>
-      </div>
-      <span class="status status-{{ summary.status|lower|replace(' ', '-') }}">{{ summary.status }}</span>
-    </div>
-    <div class="project-brief-content">
-      {% if summary.now_label %}
-        <p class="project-brief-line project-now"><strong>Now:</strong> {{ summary.now_label }}</p>
-      {% endif %}
-      {% if blocker_or_decision %}
-        <p class="project-brief-line project-attention"><strong>Blocker / decision:</strong> {{ blocker_or_decision.what_changed }}</p>
-      {% endif %}
-      {% if result %}
-        <p class="project-brief-line project-latest"><strong>Latest:</strong> {{ result.what_changed }}</p>
-      {% endif %}
-      {% if progress or todo_count %}
-        <a class="project-planning-summary" href="{{ url_for('project', project_id=project.project_id) }}#planning">
-          {% if progress %}Roadmap {{ progress.completed }}/{{ progress.total }}{% endif %}
-          {% if progress and todo_count %} · {% endif %}
-          {% if todo_count %}{{ todo_count }} TODO{% if todo_count != 1 %}s{% endif %}{% endif %}
-        </a>
-      {% endif %}
-    </div>
-    <p class="project-brief-footer">Updated {{ summary.brief_updated_at.strftime('%Y-%m-%d') }}{% if summary.freshness.stale is true %} · status may be stale{% endif %}</p>
-  </article>
-{%- endmacro %}
-
 {% block content %}
+  {% set labels = {'needs-me': 'Needs me', 'blocked': 'Blocked', 'regular': 'Regular updates'} %}
   <div class="page-intro dashboard-intro">
     <div>
-      <p class="eyebrow">Portfolio briefing</p>
-      <h1>Research portfolio</h1>
-      <p class="lede">Verified current state for the projects you are actively carrying.</p>
+      <p class="eyebrow">Your research</p>
+      <h1>Project progress</h1>
+      <p class="lede">Current plan work and what comes next. Newest updates first.</p>
+      <p><a href="{{ url_for('index') }}?domain={{ domain|urlencode }}{{ '' if show_archived else '&archived=true' }}">{{ 'Current projects' if show_archived else 'Finished / archived projects' }} →</a></p>
     </div>
   </div>
-
-  <section class="dashboard-section portfolio-section" aria-labelledby="portfolio-heading">
+  <section class="dashboard-section portfolio-section" aria-label="Project progress">
+    <nav class="dashboard-filters domain-tabs" aria-label="Project portfolio">
+      {% for tab in domain_tabs %}
+        <a href="{{ url_for('index') }}?domain={{ tab.key|urlencode }}{{ '&archived=true' if show_archived else '' }}"{% if domain == tab.key %} aria-current="page"{% endif %}>{{ tab.label }} <span>{{ tab.count }}</span></a>
+      {% endfor %}
+    </nav>
     <div class="section-heading">
-      <div>
-        <p class="eyebrow">Project briefs</p>
-        <h2 id="portfolio-heading">Research portfolio</h2>
-      </div>
-      <span class="count">{{ projects|length }}</span>
-    </div>
-    {% if projects %}
-      <div class="project-brief-list">
-        {% for summary in projects %}{{ project_brief(summary) }}{% endfor %}
-      </div>
-    {% else %}
-      <p class="empty-state">No projects yet. Add a project, then ingest a semantic event to begin its verifiable history.</p>
-    {% endif %}
-  </section>
-
-  <section class="dashboard-section" aria-labelledby="needs-me-heading">
-    <div class="section-heading">
-      <div>
-        <p class="eyebrow">Your decision</p>
-        <h2 id="needs-me-heading">Needs me</h2>
-      </div>
-      <span class="count">{{ needs_me|length }}</span>
-    </div>
-    {% if needs_me %}
-      <div class="card-grid">
-        {% for item in needs_me %}{{ event_card(item, 'decision') }}{% endfor %}
-      </div>
-    {% else %}
-      <p class="empty-state">No current decisions are recorded.</p>
-    {% endif %}
-  </section>
-
-  <section class="dashboard-section" aria-labelledby="watch-heading">
-    <div class="section-heading">
-      <div>
-        <p class="eyebrow">Research and operations</p>
-        <h2 id="watch-heading">Watch</h2>
-      </div>
-      <span class="count">{{ watch|length }}</span>
-    </div>
-    {% if watch %}
-      <div class="card-grid">
-        {% for item in watch %}
-          {% set watch_class = 'blocker' if item.importance == 'Critical blocker' else 'risk' %}
-          {{ event_card(item, watch_class) }}
+      <div class="dashboard-filters" aria-label="Filter project updates">
+        <button type="button" data-dashboard-filter="all">All projects <span>{{ project_updates|length }}</span></button>
+        {% for key, label in labels.items() %}
+          <button type="button" data-dashboard-filter="{{ key }}">{{ label }} <span>{{ project_updates|selectattr('category', 'equalto', key)|list|length }}</span></button>
         {% endfor %}
       </div>
+    </div>
+    <p class="muted update-explanation">Categories describe the latest update. Earlier decisions and blockers remain in each project.</p>
+    <div class="project-brief-list latest-project-feed">
+    {% for row in project_updates %}
+      {% set item = row['update'] %}
+      <article class="project-brief update-{{ row.category }}" data-dashboard-item="project" data-dashboard-kinds="{{ row.category }}" aria-labelledby="project-brief-{{ row.project.project_id }}">
+        <div class="project-brief-heading">
+          <h2 id="project-brief-{{ row.project.project_id }}"><a href="{{ url_for('project', project_id=row.project.project_id) }}">{{ row.project.name }}</a></h2>
+          <span class="status">{{ labels[row.category] }}{% if row.project.lifecycle in ('Completed', 'Archived') %} · {{ row.project.lifecycle }}{% endif %}</span>
+        </div>
+        <div class="project-brief-content">
+          {% if item %}
+            <p class="project-update-date"><time datetime="{{ item.observed_at[:10] if item.event_type == 'project_log_update' else item.observed_at }}">{{ item.observed_at[:10] }}{% if item.event_type != 'project_log_update' %} · {{ item.observed_at[11:16] }} {{ 'UTC' if item.observed_at.endswith(('Z', '+00:00')) else item.observed_at[-6:] }}{% endif %}</time></p>
+            {% if item.evidence_availability != 'available' %}<p class="update-uncertain">Unverified update · supporting evidence {{ item.evidence_availability }}. This does not establish a confirmed project status.</p>{% endif %}
+          {% endif %}
+          {% if row.plan_step %}
+            <p class="project-brief-line project-activity-line"><strong>Current plan step:</strong> {{ row.plan_step.title }} <span class="muted">({{ row.plan_step.status }})</span></p>
+            {% if row.plan_step.note %}<p class="project-brief-line">{{ row.plan_step.note }}</p>{% endif %}
+            {% if row.plan_step.next %}<p class="project-brief-line project-now"><strong>Next plan step:</strong> {{ row.plan_step.next }}</p>
+            {% elif row.next_action %}<p class="project-brief-line project-now"><strong>Next recorded action:</strong> {{ row.next_action }}</p>{% endif %}
+            {% if row.progress_brief %}{{ progress_lines(row) }}{% endif %}
+          {% elif row.progress_brief %}
+            {{ progress_lines(row) }}
+          {% else %}
+            <p class="project-brief-line"><strong>Current plan step:</strong> Not confirmed by a registered plan.</p>
+            {% if item %}<p class="project-brief-line project-activity-line"><strong>Latest activity:</strong> {{ row.activity }}</p>{% endif %}
+            {% if row.next_action %}<p class="project-brief-line project-now"><strong>Next recorded action:</strong> {{ row.next_action }}</p>{% endif %}
+          {% endif %}
+          {% if item %}
+            <details class="brief-records">
+              <summary>Full update and evidence</summary>
+              {% if row.progress_brief %}
+                <p><strong>Recorded step:</strong> {{ row.progress_brief.current_step }}</p>
+                <p><strong>Purpose:</strong> {{ row.progress_brief.purpose }}</p>
+                {% if row.progress_brief.next_step %}<p><strong>Next step:</strong> {{ row.progress_brief.next_step }}</p>{% endif %}
+              {% endif %}
+              <p>{{ item.what_changed }}</p>
+              {% if item.context %}<p>{{ item.context }}</p>{% endif %}
+              {% if item.impact %}<p><strong>Impact:</strong> {{ item.impact }}</p>{% endif %}
+              {% if item.next_action and item.evidence_availability == 'available' %}<p><strong>Next:</strong> {{ item.next_action }}</p>{% endif %}
+              <p>{{ item.importance }} · Evidence: {{ item.evidence_availability }}</p>
+              <a href="{{ url_for('project', project_id=row.project.project_id) }}#event-{{ item.event_id }}">Open recorded update</a>
+            </details>
+          {% else %}
+            <p class="empty-state">No updates recorded yet.</p>
+          {% endif %}
+          <a class="project-planning-summary" href="{{ url_for('project', project_id=row.project.project_id) }}">View project and earlier records →</a>
+        </div>
+      </article>
     {% else %}
-      <p class="empty-state">No current blockers or research and operational risks are recorded.</p>
-    {% endif %}
-  </section>
-
-  <section class="dashboard-section" aria-labelledby="changes-heading">
-    <div class="section-heading">
-      <div>
-        <p class="eyebrow">Audit trail</p>
-        <h2 id="changes-heading">Recent changes</h2>
-      </div>
-      <span class="count">{{ changes|length }}</span>
+      <p class="empty-state">No projects yet in this view. Admit an independent ongoing project, then ingest a semantic event to begin its verifiable history.</p>
+    {% endfor %}
     </div>
-    <details class="recent-history">
-      <summary>Show changes since the last review</summary>
-      <div class="history-content">
-        {% if changes %}
-          <div class="card-grid">
-            {% for item in changes %}{{ event_card(item) }}{% endfor %}
-          </div>
-        {% else %}
-          <p class="empty-state">No new recorded changes since the last review.</p>
-        {% endif %}
-      </div>
-    </details>
+    <p class="empty-state" data-dashboard-empty hidden>No latest project updates in this category. View all projects to see recent progress.</p>
   </section>
-
-  <section class="dashboard-section" aria-labelledby="completed-heading">
-    <div class="section-heading">
-      <div>
-        <p class="eyebrow">Evidence-backed outcomes</p>
-        <h2 id="completed-heading">Recently completed</h2>
-      </div>
-      <span class="count">{{ recently_completed|length }}</span>
-    </div>
-    <details class="recent-completions">
-      <summary>Show recently completed work</summary>
-      <div class="history-content">
-        {% if recently_completed %}
-          <div class="card-grid">
-            {% for item in recently_completed %}{{ event_card(item, 'completed') }}{% endfor %}
-          </div>
-        {% else %}
-          <p class="empty-state">No newly completed, evidence-backed work since the last review.</p>
-        {% endif %}
-      </div>
-    </details>
-  </section>
+  {% include "inbox.html" %}
 {% endblock %}

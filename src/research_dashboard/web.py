@@ -14,7 +14,9 @@ from .plan_sync import list_pending_proposal_batches, plan_sync_status
 from .planning import planning_summary
 from .provenance import path_uri
 from .settings import Settings, load_settings
+from .inbox_routing import list_inbox_items
 from .state import portfolio_query, portfolio_read_model, project_read_model
+from .presentation import project_updates, readable_text
 
 
 TEMPLATE_ROOT = Path(__file__).with_name("templates")
@@ -29,8 +31,24 @@ def context_actions(
     return ["Open project"] if item.get("project_id") else []
 
 
-def _dashboard_context(connection: Any) -> dict[str, Any]:
-    return portfolio_read_model(connection)
+def _dashboard_context(connection: Any, *, show_archived: bool = False, domain: str | None = None) -> dict[str, Any]:
+    context = portfolio_read_model(connection)
+    for summary in context["projects"]:
+        project_id = summary["project"]["project_id"]
+        summary["roadmap"] = planning_summary(connection, project_id)["roadmap"]
+        summary["plan_sync"] = plan_sync_status(connection, project_id)
+    rows = project_updates(context["projects"], include_archived=show_archived)
+    if show_archived:
+        rows = [row for row in rows if row["project"]["lifecycle"] in {"Archived", "Completed"}]
+    domains = sorted({summary["project"]["domain"] for summary in context["projects"]})
+    context["domain_tabs"] = [{"key": "", "label": "All", "count": len(rows)}] + [
+        {"key": value, "label": value, "count": sum(row["project"]["domain"] == value for row in rows)} for value in domains
+    ]
+    context["project_updates"] = [row for row in rows if not domain or row["project"]["domain"] == domain]
+    context["domain"] = domain or ""
+    context["show_archived"] = show_archived
+    context["inbox_items"] = list_inbox_items(connection)
+    return context
 
 
 def _project_page_context(connection: Any, project_id: str) -> dict[str, Any] | None:
@@ -74,12 +92,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application = FastAPI(title="Research Dashboard")
     templates = Jinja2Templates(directory=str(TEMPLATE_ROOT))
     templates.env.filters["registered_path_uri"] = path_uri
+    templates.env.filters["readable_text"] = readable_text
     application.mount("/static", StaticFiles(directory=str(STATIC_ROOT)), name="static")
     application.state.settings = settings
 
     @application.get("/", name="index")
-    def index(request: Request):
-        context = _with_connection(settings, _dashboard_context)
+    def index(request: Request, archived: bool = False, domain: str | None = None):
+        context = _with_connection(settings, lambda connection: _dashboard_context(connection, show_archived=archived, domain=domain))
         return templates.TemplateResponse(
             request=request,
             name="index.html",

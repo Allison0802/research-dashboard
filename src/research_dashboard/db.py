@@ -30,6 +30,7 @@ REQUIRED_SCHEMA_TABLES = frozenset(
         "todos",
         "roadmap_sync_state",
         "roadmap_proposal_batches",
+        "activity_inbox",
     }
 )
 
@@ -80,6 +81,8 @@ def init_db(settings: Settings | None = None) -> sqlite3.Connection:
     connection = connect_db(settings)
     try:
         connection.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        if "progress_json" not in {row["name"] for row in connection.execute("PRAGMA table_info(events)")}:
+            connection.execute("ALTER TABLE events ADD COLUMN progress_json TEXT")
         connection.commit()
     except Exception:
         connection.close()

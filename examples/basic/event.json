@@ -9,6 +9,11 @@
   "epistemic_status": "Observed",
   "context": "A synthetic baseline model review was completed.",
   "what_changed": "The synthetic example is ready for active work.",
+  "progress": {
+    "current_step": "Step 1: synthetic baseline preparation",
+    "purpose": "Prepare the example inputs before evaluating the model.",
+    "next_step": "Run the synthetic baseline model."
+  },
   "next_action": "Run the synthetic baseline model.",
   "source_agent": "example-agent",
   "source_session": "example-session-001",

@@ -4,18 +4,19 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Research Dashboard{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}?v=0.3.0">
   </head>
   <body>
     <header class="site-header">
       <div class="shell header-inner">
         <a class="brand" href="{{ url_for('index') }}">Research Dashboard</a>
-        <span class="header-status">Local semantic state</span>
+        <span class="header-status">Your research at a glance</span>
       </div>
     </header>
     <main class="shell">
       {% block content %}{% endblock %}
     </main>
+    <script src="{{ url_for('static', path='dashboard.js') }}?v=latest-project-feed" defer></script>
     {% block scripts %}{% endblock %}
   </body>
 </html>

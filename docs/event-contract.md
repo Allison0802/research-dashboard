@@ -51,6 +51,7 @@ database errors are not retried automatically.
 | `epistemic_status` | Yes | One of `Observed`, `Derived`, or `Inferred`, describing how the claim was obtained. |
 | `context` | Yes | Non-empty factual context needed to interpret the update. |
 | `what_changed` | Yes | Non-empty description of the material change. |
+| `progress` | No | Object with nonempty `current_step` and `purpose`, plus optional `next_step` (text or null). Reported progress does not independently validate a result. |
 | `cause` | No | Optional known cause; omit it when unknown. |
 | `impact` | No | Optional expected or observed consequence. |
 | `next_action` | No | Optional proposed follow-up; it is not evidence of completion. |
@@ -64,6 +65,17 @@ database errors are not retried automatically.
 | `evidence` | No | List of evidence records supporting the event; defaults to an empty list. |
 
 ## Evidence records
+
+Progress fields contain research language: the canonical step number/title,
+what it accomplishes, and what follows. Say when the step number is unknown;
+keep execution identifiers and diagnostics in context/evidence. A current
+roadmap leads older reported steps; matching a file path alone does not bind
+an event to the current plan version.
+
+The external writer accepts admitted Active, Waiting, and Paused projects.
+Candidates and terminal projects require an explicit admission/reopening
+decision before new external submissions. Log and inbox imports remain source
+observations with preserved limitations, not scientific approvals.
 
 Each item in `evidence` has these fields:
 

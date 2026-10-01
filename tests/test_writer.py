@@ -36,6 +36,7 @@ def _initialized_runtime(tmp_path):
                 "project_id": "writer-project",
                 "name": "Writer project",
                 "domain": "General Research",
+                "lifecycle": "Active",
             },
         )
     finally:

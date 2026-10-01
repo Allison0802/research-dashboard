@@ -104,256 +104,53 @@ def test_homepage_renders_with_empty_database(tmp_path):
     assert "semantic event" in response.text.lower()
 
 
-def test_homepage_returns_200_and_uses_project_first_screen_order(dashboard, client):
-    _, connection = dashboard
-    add_event(
-        connection,
-        0,
-        task_key="completed-task",
-        new_state="Completed",
-        importance="Completed milestone",
-        what_changed="Completed task",
-    )
+def test_homepage_returns_200_and_shows_latest_update_filters(dashboard, client):
     response = client.get("/")
-
     assert response.status_code == 200
-    page = response.text
-    headings = [
-        "Research portfolio",
-        "Needs me",
-        "Watch",
-        "Recent changes",
-        "Recently completed",
-    ]
-    assert [page.index(heading) for heading in headings] == sorted(
-        page.index(heading) for heading in headings
-    )
-    assert "Live HPC" not in page
+    assert "Project progress" in response.text
+    for category in ("all", "needs-me", "blocked", "regular"):
+        assert f'data-dashboard-filter="{category}"' in response.text
+    assert "Blocked and Watch" not in response.text
 
 
-def test_homepage_orders_changes_by_priority(dashboard, client):
+def test_homepage_only_shows_latest_project_event(dashboard, client):
     _, connection = dashboard
-    add_event(
-        connection,
-        0,
-        task_key="routine",
-        what_changed="Routine change",
-    )
-    add_event(
-        connection,
-        1,
-        task_key="blocker",
-        event_type="risk",
-        new_state=None,
-        importance="Critical blocker",
-        risk_type="Research",
-        what_changed="Critical blocker",
-    )
-
+    add_event(connection, 0, task_key="old", what_changed="Old decision", importance="Decision needed")
+    add_event(connection, 1, task_key="new", what_changed="Latest progress")
     page = client.get("/").text
-    history_start = page.index("Recent changes")
+    assert "Latest progress" in page
+    assert "Old decision" not in page
+    assert page.count('data-dashboard-item="project"') == 3
+    assert 'data-dashboard-kinds="needs-me"' not in page
 
-    assert page.index("Critical blocker", history_start) < page.index(
-        "Routine change", history_start
-    )
 
-
-def test_homepage_renders_compact_evidence_safe_project_briefs(
-    dashboard, client, tmp_path
-):
+def test_homepage_labels_latest_unverified_update(dashboard, client):
     _, connection = dashboard
-    set_governing_plan(connection, "alpha-project", tmp_path / "alpha-plan.md")
-    set_governing_plan(connection, "beta-project", tmp_path / "beta-plan.md")
-    connection.execute(
-        "UPDATE projects SET update_horizon_minutes = ? WHERE project_id = ?",
-        (30, "alpha-project"),
-    )
-    connection.execute(
-        "UPDATE projects SET updated_at = ? WHERE project_id = ?",
-        ("2026-08-01T08:30:00+00:00", "beta-project"),
-    )
-    connection.commit()
-    create_roadmap_item(
-        connection,
-        {"project_id": "alpha-project", "title": "Fit sensitivity model"},
-    )
-    create_todo(
-        connection,
-        {"project_id": "alpha-project", "title": "Review sensitivity model"},
-    )
-    add_event(
-        connection,
-        0,
-        task_key="external-extract",
-        previous_state="Active",
-        new_state="Waiting",
-        what_changed="Wait for the corrected external extract.",
-    )
-    add_event(
-        connection,
-        1,
-        project_id="beta-project",
-        task_key="unconfirmed-decision",
-        event_type="note",
-        previous_state=None,
-        new_state=None,
-        importance="Decision needed",
-        what_changed="Choose an unsupported primary analysis.",
-        evidence=[],
-    )
-    add_event(
-        connection,
-        2,
-        project_id="beta-project",
-        task_key="unavailable-blocker",
-        event_type="risk",
-        previous_state=None,
-        new_state=None,
-        importance="Critical blocker",
-        risk_type="Research",
-        what_changed="An unavailable scheduler report claims a blocker.",
-        evidence=[
-            {
-                "evidence_type": "scheduler",
-                "locator": "job-unavailable",
-                "authority": 1,
-                "availability": "unavailable",
-            }
-        ],
-    )
-    add_event(
-        connection,
-        3,
-        task_key="unknown-update",
-        event_type="note",
-        previous_state=None,
-        new_state=None,
-        observed_at=datetime.now(timezone.utc),
-        what_changed="An unknown update claims a newer status.",
-        evidence=[
-            {
-                "evidence_type": "scheduler",
-                "locator": "job-unknown",
-                "authority": 1,
-                "availability": "unknown",
-            }
-        ],
-    )
-
+    add_event(connection, 0, what_changed="Unverified report", next_action="Unconfirmed action", evidence=[])
     page = client.get("/").text
-    portfolio_start = page.index("Research portfolio")
-    needs_me_start = page.index("Needs me")
-    portfolio = page[portfolio_start:needs_me_start]
-
-    def brief(project_id):
-        start = page.index(f'aria-labelledby="project-brief-{project_id}"')
-        return page[start : page.index("</article>", start)]
-
-    alpha_brief = brief("alpha-project")
-    beta_brief = brief("beta-project")
-    gamma_brief = brief("gamma-project")
-
-    assert alpha_brief.count('<span class="status ') == 1
-    assert "<dt>Status</dt>" not in portfolio
-    assert "Domain:" not in portfolio
-    assert "project-links" not in portfolio
-    assert "portfolio-domain" not in portfolio
-    assert "None recorded" not in portfolio
-    assert "No immediate action recorded" not in portfolio
-    assert "No current evidence-backed work recorded" not in portfolio
-    assert "<strong>Now:</strong> Wait for the corrected external extract." in alpha_brief
-    assert 'href="http://testserver/projects/alpha-project#planning"' in alpha_brief
-    assert "Roadmap 0/1" in alpha_brief
-    assert "1 TODO" in alpha_brief
-    assert "Updated 2026-08-07 · status may be stale" in alpha_brief
-    assert "Plan ready — execution not started" in beta_brief
-    assert "Updated 2026-08-01" in beta_brief
-    assert "Choose an unsupported primary analysis." not in beta_brief
-    assert "An unavailable scheduler report claims a blocker." not in beta_brief
-    assert "project-attention" not in beta_brief
-    assert "project-attention" not in gamma_brief
-    assert "project-latest" not in gamma_brief
-    assert "project-planning-summary" not in gamma_brief
+    assert "Unverified report" in page
+    assert "Unverified update" in page
+    assert "Unconfirmed action" not in page
 
 
-def test_homepage_separates_decisions_from_watch_after_service_review(dashboard, client):
+def test_homepage_latest_category_survives_review(dashboard, client):
     _, connection = dashboard
-    add_event(
-        connection,
-        0,
-        task_key="decision-task",
-        importance="Decision needed",
-        what_changed="Choose the primary analysis population.",
-        next_action="Select the analysis population.",
-    )
-    add_event(
-        connection,
-        1,
-        task_key="risk-task",
-        event_type="risk",
-        new_state=None,
-        importance="Research risk",
-        risk_type="Research",
-        risk_severity="High",
-        what_changed="Unresolved analysis risk",
-    )
-
+    add_event(connection, 0, importance="Decision needed", what_changed="Choose the population")
     mark_reviewed(connection)
     page = client.get("/").text
-    needs_me_start = page.index("Needs me")
-    watch_start = page.index("Watch")
-    changes_start = page.index("Recent changes")
-    needs_me = page[needs_me_start:watch_start]
-    watch = page[watch_start:changes_start]
-
-    assert "Choose the primary analysis population." in needs_me
-    assert "Choose the primary analysis population." not in watch
-    assert "Unresolved analysis risk" in watch
-    assert "Unresolved analysis risk" not in needs_me
+    assert "Choose the population" in page
+    assert 'data-dashboard-kinds="needs-me"' in page
 
 
-def test_homepage_and_project_route_keep_all_current_task_decisions(
-    dashboard, client
-):
+def test_latest_feed_retains_earlier_decisions_on_project_page(dashboard, client):
     _, connection = dashboard
-    add_event(
-        connection,
-        0,
-        workstream="analysis",
-        task_key="analysis-population",
-        event_type="note",
-        previous_state=None,
-        new_state=None,
-        importance="Decision needed",
-        what_changed="Choose the analysis population.",
-    )
-    add_event(
-        connection,
-        1,
-        workstream="analysis",
-        task_key="missing-data-method",
-        event_type="note",
-        previous_state=None,
-        new_state=None,
-        importance="Decision needed",
-        what_changed="Choose the missing-data method.",
-    )
-
-    homepage = client.get("/").text
-    needs_me_start = homepage.index("Needs me")
-    watch_start = homepage.index("Watch")
-    needs_me = homepage[needs_me_start:watch_start]
-    project_page = client.get("/projects/alpha-project").text
-    decisions_start = project_page.index("Decisions, blockers, and risks")
-    findings_start = project_page.index("Recent findings")
-    decisions = project_page[decisions_start:findings_start]
-
-    for decision in (
-        "Choose the analysis population.",
-        "Choose the missing-data method.",
-    ):
-        assert decision in needs_me
-        assert decision in decisions
+    add_event(connection, 0, task_key="population", importance="Decision needed", what_changed="Choose population")
+    add_event(connection, 1, task_key="method", importance="Decision needed", what_changed="Choose method")
+    home = client.get("/").text
+    project = client.get("/projects/alpha-project").text
+    assert "Choose method" in home
+    assert "Choose population" not in home
+    assert "Choose method" in project and "Choose population" in project
 
 
 def test_homepage_redacts_actions_for_conflicted_tasks_but_keeps_blocker_visible(
@@ -387,27 +184,13 @@ def test_homepage_redacts_actions_for_conflicted_tasks_but_keeps_blocker_visible
     assert "Use the conflicting action." not in page
 
 
-def test_homepage_shows_all_projects_and_collapsed_history(dashboard, client):
-    _, connection = dashboard
-    add_event(
-        connection,
-        0,
-        task_key="completed-task",
-        new_state="Completed",
-        importance="Completed milestone",
-        what_changed="Recently completed work",
-    )
-
+def test_homepage_shows_all_projects_without_historical_feeds(dashboard, client):
     page = client.get("/").text
-
-    assert "Portfolio Alpha" in page
-    assert "Portfolio Beta" in page
-    assert "Portfolio Gamma" in page
-    assert "<details class=\"recent-history\">" in page
-    assert "<details class=\"recent-completions\">" in page
-    assert '<details class="recent-history" open' not in page
-    assert '<details class="recent-completions" open' not in page
-    assert "Recently completed" in page
+    for name in ("Portfolio Alpha", "Portfolio Beta", "Portfolio Gamma"):
+        assert name in page
+    assert "No updates recorded yet." in page
+    assert "Recent changes" not in page
+    assert "Recently completed" not in page
 
 
 def test_get_homepage_does_not_mark_reviewed(dashboard, client):

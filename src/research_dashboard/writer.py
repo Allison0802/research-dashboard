@@ -7,6 +7,7 @@ from typing import Any
 from .db import connect_db
 from .domain import SemanticEventInput
 from .events import ingest_event
+from .registry import get_project, is_admitted_project
 from .settings import load_settings
 
 
@@ -90,6 +91,9 @@ def submit_event(event: SemanticEventInput | dict[str, Any]) -> dict[str, Any]:
     try:
         connection = connect_db(settings)
         _preflight_writable(connection)
+        project = get_project(connection, value.project_id)
+        if project is None or not is_admitted_project(project):
+            raise ValueError("project is not admitted; admit an independent ongoing project before recording progress")
         result = ingest_event(connection, value)
     except sqlite3.Error as error:
         raise _classify_sqlite_error(error) from error

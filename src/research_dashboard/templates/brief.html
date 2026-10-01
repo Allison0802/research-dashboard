@@ -1,0 +1,3 @@
+{% macro excerpt(text, limit=220) -%}
+  {{ text|readable_text|truncate(limit, false, '…') }}
+{%- endmacro %}

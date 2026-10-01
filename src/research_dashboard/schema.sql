@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS events (
         CHECK(epistemic_status IN ('Observed', 'Derived', 'Inferred')),
     context TEXT NOT NULL,
     what_changed TEXT NOT NULL,
+    progress_json TEXT,
     cause TEXT,
     impact TEXT,
     next_action TEXT,
@@ -264,3 +265,13 @@ CREATE TABLE IF NOT EXISTS roadmap_proposal_batches (
 
 CREATE INDEX IF NOT EXISTS roadmap_proposal_batches_pending
 ON roadmap_proposal_batches(project_id, status, created_at);
+
+CREATE TABLE IF NOT EXISTS activity_inbox (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL CHECK(length(trim(title)) > 0),
+    note TEXT,
+    candidate_project_ids_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    assigned_project_id TEXT,
+    FOREIGN KEY(assigned_project_id) REFERENCES projects(project_id)
+);

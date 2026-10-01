@@ -54,12 +54,40 @@ Use `.venv/bin/research-dashboard project root-add` to register a project root,
 `.venv/bin/research-dashboard project plan-set` to register a governing plan,
 and `.venv/bin/research-dashboard portfolio query` to query derived state.
 
+The homepage shows one latest update per admitted project, newest first by
+observation time. Domain tabs use your registered domains, with no fixed
+portfolio names. Completed and Archived projects have a separate historical
+view; hidden candidates do not clutter the current portfolio. Needs me, Blocked,
+and Regular update filters apply within each domain.
+
+Optional progress fields describe the current/recorded step, purpose, and next
+step. Technical details remain expandable. A current registered roadmap leads
+older event summaries, and unverified or stale claims stay explicitly labeled.
+
+See [project admission and synchronization](docs/project-sync.md) for explicit
+admission, optional discovery, dated-log imports, and automatic attribution of
+incoming activity. Normal sync uses the admitted registry and never scans the
+global filesystem. Local terminal agents, including Remote Desktop Commander,
+can use the same CLI and receipt contract without a specific connector.
+
 The browser interface serves GET routes only. Write events through the CLI or
 the Python API, then use the dashboard to inspect the resulting state.
+
+## Upgrading
+
+Version 0.3.0 adds progress summaries, domain navigation, project admission,
+log synchronization, and inbox attribution. Back up an existing runtime with
+`.venv/bin/research-dashboard snapshot create --destination EXISTING_DIRECTORY`.
+After updating the package, run `.venv/bin/research-dashboard init` to add the
+progress column and inbox table without rewriting existing events/provenance.
+Restart a running server to load the new application code.
 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
 - [Semantic event contract](docs/event-contract.md)
 - [Extension guide](docs/extending.md)
+- [Project admission and synchronization](docs/project-sync.md)
+- [Terminal-agent example](examples/terminal-agent/README.md)
+- [Changelog](CHANGELOG.md)
 - [Public design contract](docs/superpowers/specs/2026-08-24-public-portability-design.md)

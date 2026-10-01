@@ -2,6 +2,7 @@
 
 from datetime import date, datetime, time, timedelta, timezone
 import sqlite3
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -74,7 +75,7 @@ _EVENT_COLUMNS = (
     "previous_state, new_state, importance, risk_type, risk_severity, "
     "epistemic_status, context, what_changed, cause, impact, next_action, "
     "confidence, governing_plan_path, source_agent, source_session, observed_at, "
-    "ingested_at, corrects_event_id"
+    "ingested_at, corrects_event_id, progress_json"
 )
 
 
@@ -144,6 +145,8 @@ def _event_record(
     evidence: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     record = dict(row)
+    progress_json = record.pop("progress_json", None)
+    record["progress"] = json.loads(progress_json) if progress_json else None
     event_evidence = (
         _evidence_for_event(connection, record["event_id"])
         if evidence is None

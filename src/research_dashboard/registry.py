@@ -4,6 +4,7 @@ Registry functions require connections from :func:`research_dashboard.db.connect
 they must use ``sqlite3.Row`` and have SQLite foreign-key enforcement enabled.
 """
 
+from datetime import datetime, timezone
 from pathlib import Path
 import sqlite3
 from typing import Any
@@ -14,6 +15,32 @@ from .domain import ProjectInput
 
 
 CONTEXT_COVERAGE_INCOMPLETE = "Context coverage incomplete"
+ADMITTED_LIFECYCLES = frozenset({"Active", "Waiting", "Paused"})
+
+
+def is_admitted_project(project: dict[str, Any]) -> bool:
+    return project.get("lifecycle") in ADMITTED_LIFECYCLES
+
+
+def set_project_lifecycle(
+    connection: sqlite3.Connection, project_id: str, lifecycle: str
+) -> dict[str, Any]:
+    """Set an existing project's lifecycle without reopening terminal records."""
+    _validate_connection(connection)
+    if lifecycle not in ADMITTED_LIFECYCLES | {"Completed", "Archived", "Needs classification"}:
+        raise ValueError("invalid project lifecycle")
+    with transaction(connection):
+        current = _fetch_project(connection, project_id)
+        if current is None:
+            raise LookupError("project not found")
+        if current["lifecycle"] in {"Completed", "Archived"} and lifecycle != current["lifecycle"]:
+            raise ValueError("completed or archived projects require an explicit reopening decision")
+        if current["lifecycle"] != lifecycle:
+            connection.execute(
+                "UPDATE projects SET lifecycle = ?, updated_at = ? WHERE project_id = ?",
+                (lifecycle, datetime.now(timezone.utc).isoformat(), project_id),
+            )
+        return _fetch_project(connection, project_id)
 
 
 def _validate_connection(connection: sqlite3.Connection) -> None:

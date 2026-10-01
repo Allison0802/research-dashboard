@@ -1,0 +1,13 @@
+{% if inbox_items %}
+  <section class="dashboard-section" aria-labelledby="inbox-heading">
+    <div class="section-heading"><h2 id="inbox-heading">Needs assignment</h2><span class="count">{{ inbox_items|length }}</span></div>
+    <p class="muted">These records have no definitive project owner. Resolve them through the inbox CLI or Python API.</p>
+    {% for item in inbox_items %}
+      <article class="card">
+        <h3>{{ item.title }}</h3>
+        <p class="muted">{{ item.created_at[:10] }}</p>
+        {% if item.note %}<details><summary>Original activity</summary><p>{{ item.note }}</p></details>{% endif %}
+      </article>
+    {% endfor %}
+  </section>
+{% endif %}

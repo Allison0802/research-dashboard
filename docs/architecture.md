@@ -37,6 +37,9 @@ The system keeps the following concerns separate:
 1. **Registry** records explicitly added projects, optional project roots, and
    governing-plan references. A project domain is arbitrary text; the registry
    never maps it to a fixed portfolio or behavior.
+   Active, Waiting, and Paused projects are admitted; Needs classification
+   candidates stay hidden. Admission inspects one named project root and stores
+   its reason. Default synchronization never scans global folders.
 2. **Semantic event ledger** records observed project changes and their
    evidence. Events are append-only; later events can correct earlier state
    without rewriting history.
@@ -48,6 +51,11 @@ The system keeps the following concerns separate:
    normalized state. Optional adapters translate an explicitly requested
    external backend into this neutral store; the core and web views remain
    backend-neutral.
+
+6. **Activity inbox** retains unresolved source records. Generic deterministic
+   attribution imports only uniquely owned activity into project history with
+   original payload/date and unknown scientific evidence. It creates neither
+   TODOs nor task transitions. Log sync reads named logs at admitted roots.
 
 ## Semantic update path
 

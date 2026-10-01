@@ -225,6 +225,8 @@ def test_project_plan_set_bootstraps_structured_roadmap_and_acknowledges_plan(
             "Demo",
             "--domain",
             "Research",
+            "--lifecycle",
+            "Active",
         )[0]
         == 0
     )
@@ -302,6 +304,8 @@ def test_project_plan_set_leaves_prose_plan_ambiguous_without_guessing(
             "Demo",
             "--domain",
             "Research",
+            "--lifecycle",
+            "Active",
         )[0]
         == 0
     )
@@ -371,6 +375,8 @@ def test_workstream_plan_set_remains_registry_only_and_preserves_project_sync(
             "Demo",
             "--domain",
             "Research",
+            "--lifecycle",
+            "Active",
         )[0]
         == 0
     )
@@ -445,6 +451,8 @@ def test_planning_sync_plan_leaves_roadmap_bootstrapped_by_project_plan_set(
             "Demo",
             "--domain",
             "Research",
+            "--lifecycle",
+            "Active",
         )[0]
         == 0
     )
@@ -497,6 +505,8 @@ def test_planning_apply_accepts_stdin_stamps_agent_and_preserves_omitted_values(
             "Demo",
             "--domain",
             "Research",
+            "--lifecycle",
+            "Active",
         )[0]
         == 0
     )
@@ -568,6 +578,8 @@ def test_planning_apply_clears_explicit_null_todo_values(monkeypatch, capsys, tm
             "Demo",
             "--domain",
             "Research",
+            "--lifecycle",
+            "Active",
         )[0]
         == 0
     )
@@ -646,6 +658,8 @@ def test_planning_apply_creates_a_reviewable_proposal_batch(
             "Demo",
             "--domain",
             "Research",
+            "--lifecycle",
+            "Active",
         )[0]
         == 0
     )
@@ -710,6 +724,8 @@ def test_planning_apply_rejects_invalid_operations_and_rolls_back_batch(
             "Demo",
             "--domain",
             "Research",
+            "--lifecycle",
+            "Active",
         )[0]
         == 0
     )
@@ -791,6 +807,8 @@ def test_event_add_accepts_file_and_returns_sequence_and_conflict(
             "Demo",
             "--domain",
             "Research",
+            "--lifecycle",
+            "Active",
         )[0]
         == 0
     )
@@ -898,6 +916,8 @@ def test_event_add_accepts_agent_provenance_json(monkeypatch, capsys, tmp_path):
             "Demo",
             "--domain",
             "Research",
+            "--lifecycle",
+            "Active",
         )[0]
         == 0
     )
@@ -930,6 +950,8 @@ def test_event_add_accepts_stdin_and_invalid_input_fails(
             "Demo",
             "--domain",
             "Research",
+            "--lifecycle",
+            "Active",
         )[0]
         == 0
     )
@@ -971,6 +993,8 @@ def test_review_and_named_checkpoint_update_application_state(
             "Demo",
             "--domain",
             "Research",
+            "--lifecycle",
+            "Active",
         )[0]
         == 0
     )
@@ -1048,6 +1072,8 @@ def test_portfolio_query_cli_accepts_english_alias_and_rejects_invalid_inputs(
             "Demo",
             "--domain",
             "Research",
+            "--lifecycle",
+            "Active",
         )[0]
         == 0
     )

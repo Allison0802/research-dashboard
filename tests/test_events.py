@@ -60,6 +60,22 @@ def event_payload(**overrides):
     return payload
 
 
+def test_progress_roundtrip_keeps_provenance_and_binds_duplicate_payload(connection):
+    from research_dashboard.state import project_read_model
+    payload = event_payload(source_agent="local-terminal-agent", progress={
+        "current_step": "Step 2: validate estimates",
+        "purpose": "Check whether model estimates are ready to report.",
+        "next_step": "Prepare the manuscript tables after validation.",
+    })
+    first = ingest_event(connection, payload)
+    assert ingest_event(connection, payload)["event"]["sequence"] == first["event"]["sequence"]
+    stored = project_read_model(connection, "project-1")["timeline"][0]
+    assert stored["progress"] == payload["progress"]
+    assert stored["source_agent"] == "local-terminal-agent"
+    with pytest.raises(ValueError, match="different payload"):
+        ingest_event(connection, {**payload, "progress": {**payload["progress"], "purpose": "Different claim"}})
+
+
 def risk_payload(**overrides):
     payload = {
         "risk_key": "risk-1",

@@ -1,6 +1,7 @@
 """Append-only semantic event ingestion and task-state conflict detection."""
 
 from datetime import datetime, timezone
+import json
 import sqlite3
 from typing import Any
 from uuid import uuid4
@@ -17,7 +18,7 @@ _EVENT_COLUMNS = (
     "event_id, project_id, workstream, task_key, event_type, previous_state, "
     "new_state, importance, risk_type, risk_severity, epistemic_status, context, "
     "what_changed, cause, impact, next_action, confidence, governing_plan_path, "
-    "source_agent, source_session, observed_at, ingested_at, corrects_event_id"
+    "source_agent, source_session, observed_at, ingested_at, corrects_event_id, progress_json"
 )
 
 
@@ -127,7 +128,7 @@ def _insert_event(connection: sqlite3.Connection, value: SemanticEventInput) -> 
         "INSERT INTO events ("
         + _EVENT_COLUMNS
         + ") VALUES ("
-        + ", ".join("?" for _ in range(23))
+        + ", ".join("?" for _ in _EVENT_COLUMNS.split(","))
         + ")",
         (
             str(value.event_id),
@@ -153,12 +154,14 @@ def _insert_event(connection: sqlite3.Connection, value: SemanticEventInput) -> 
             _utc_iso(value.observed_at),
             _utc_iso(value.ingested_at),
             str(value.corrects_event_id) if value.corrects_event_id else None,
+            json.dumps(value.progress.model_dump(), sort_keys=True) if value.progress else None,
         ),
     )
 
 
 def _expected_event_payload(value: SemanticEventInput) -> dict[str, Any]:
     return {
+        "progress_json": json.dumps(value.progress.model_dump(), sort_keys=True) if value.progress else None,
         "event_id": str(value.event_id),
         "project_id": value.project_id,
         "workstream": value.workstream,

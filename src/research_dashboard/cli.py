@@ -19,6 +19,9 @@ from .domain import (
     TodoUpdateOperation,
 )
 from .executions import list_executions, register_execution
+from .discovery import admit_project, sync_projects
+from .inbox_routing import create_inbox_item, list_inbox_items, route_inbox_items
+from .log_sync import sync_project_logs
 from .plan_sync import bootstrap_roadmap_from_governing_plan, create_proposal_batch
 from .planning import (
     UNSET,
@@ -32,6 +35,8 @@ from .planning import (
 from .registry import (
     add_project,
     add_project_root,
+    is_admitted_project,
+    list_project_roots,
     list_projects,
     resolve_project_for_path,
     set_governing_plan,
@@ -79,6 +84,17 @@ def _add_project_parser(subparsers: argparse._SubParsersAction) -> None:
     root_add = commands.add_parser("root-add")
     root_add.add_argument("--project-id", required=True)
     root_add.add_argument("--path", required=True)
+
+    admit = commands.add_parser("admit")
+    admit.add_argument("--path", required=True)
+    admit.add_argument("--domain", required=True)
+    admit.add_argument("--reason", required=True)
+    admit.add_argument("--name")
+    admit.add_argument("--lifecycle", choices=("Active", "Waiting", "Paused"), default="Active")
+
+    lifecycle_set = commands.add_parser("lifecycle-set")
+    lifecycle_set.add_argument("--project-id", required=True)
+    lifecycle_set.add_argument("--lifecycle", choices=("Active", "Waiting", "Paused", "Completed", "Archived", "Needs classification"), required=True)
 
     resolve_path = commands.add_parser("resolve-path")
     resolve_path.add_argument("--path", required=True)
@@ -160,6 +176,24 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_slurm_parser(commands)
     _add_portfolio_parser(commands)
     _add_planning_parser(commands)
+
+    sync = commands.add_parser("sync")
+    sync.add_argument("--root", action="append", default=[])
+    sync.add_argument("--domain")
+    sync.add_argument("--dry-run", action="store_true")
+
+    inbox = commands.add_parser("inbox")
+    inbox_commands = inbox.add_subparsers(dest="inbox_command", required=True)
+    inbox_add = inbox_commands.add_parser("add")
+    inbox_add.add_argument("--title", required=True)
+    inbox_add.add_argument("--note")
+    inbox_add.add_argument("--candidate-project-id", action="append", default=[])
+    inbox_add.add_argument("--inbox-id")
+    inbox_add.add_argument("--created-at")
+    inbox_commands.add_parser("list")
+    inbox_route = inbox_commands.add_parser("route")
+    inbox_route.add_argument("--inbox-id")
+    inbox_route.add_argument("--dry-run", action="store_true")
 
     event = commands.add_parser("event")
     event_commands = event.add_subparsers(dest="event_command", required=True)
@@ -362,7 +396,7 @@ def _run_command(args: argparse.Namespace) -> None:
         _json(submit_event(event))
         return
 
-    read_only = args.command == "portfolio"
+    read_only = args.command == "portfolio" or (args.command == "inbox" and args.inbox_command == "list") or (args.command == "sync" and args.dry_run)
     connection = connect_db(settings, read_only=read_only)
     try:
         if args.command == "project":
@@ -382,6 +416,11 @@ def _run_command(args: argparse.Namespace) -> None:
                 )
             elif args.project_command == "root-add":
                 _json(add_project_root(connection, args.project_id, args.path))
+            elif args.project_command == "admit":
+                _json(admit_project(connection, path=args.path, domain=args.domain, reason=args.reason, name=args.name, lifecycle=args.lifecycle))
+            elif args.project_command == "lifecycle-set":
+                from .registry import set_project_lifecycle
+                _json(set_project_lifecycle(connection, args.project_id, args.lifecycle))
             elif args.project_command == "resolve-path":
                 _json(resolve_project_for_path(connection, args.path))
             elif args.project_command == "plan-set":
@@ -405,6 +444,34 @@ def _run_command(args: argparse.Namespace) -> None:
                     _json(plan_record)
             else:
                 _json(list_projects(connection))
+        elif args.command == "sync":
+            if bool(args.root) != bool(args.domain):
+                raise ValueError("--root and --domain must be supplied together")
+            if any(not Path(root).is_absolute() for root in args.root):
+                raise ValueError("discovery roots must be absolute paths")
+            discovery = sync_projects(connection, [(root, args.domain) for root in args.root], dry_run=args.dry_run) if args.root else []
+            projects = [
+                {**project, "roots": list_project_roots(connection, project["project_id"])}
+                for project in list_projects(connection)
+            ]
+            _json({
+                "projects": [project for project in projects if is_admitted_project(project)],
+                "candidates": [project for project in projects if project["lifecycle"] == "Needs classification"],
+                "discovery": discovery,
+                "log_updates": sync_project_logs(connection, dry_run=args.dry_run),
+                "inbox_routing": route_inbox_items(connection, dry_run=args.dry_run),
+            })
+        elif args.command == "inbox":
+            if args.inbox_command == "add":
+                item = create_inbox_item(connection, title=args.title, note=args.note, candidate_project_ids=args.candidate_project_id, inbox_id=args.inbox_id, created_at=args.created_at)
+                routing = route_inbox_items(connection, inbox_id=item["id"])
+                if routing and routing[0]["status"] == "routed":
+                    item["assigned_project_id"] = routing[0]["project_id"]
+                _json({"item": item, "routing": routing})
+            elif args.inbox_command == "route":
+                _json(route_inbox_items(connection, dry_run=args.dry_run, inbox_id=args.inbox_id))
+            else:
+                _json(list_inbox_items(connection))
         elif args.command == "execution":
             _json(list_executions(connection, active_only=args.active_only))
         elif args.command == "slurm":

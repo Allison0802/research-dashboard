@@ -2,11 +2,11 @@
 
 {% block title %}{{ project.project.name }} · Research Dashboard{% endblock %}
 
-{% macro event_list(events, empty_message) -%}
+{% macro event_list(events, empty_message, canonical=false) -%}
   {% if events %}
     <div class="card-grid">
       {% for item in events %}
-        <article class="card">
+        <article class="card"{% if canonical %} id="event-{{ item.event_id }}"{% endif %}>
           <div class="card-heading">
             <h3>{{ item.what_changed or item.task_key or "Recorded item" }}</h3>
             {% if item.importance %}<span class="badge priority">{{ item.importance }}</span>{% endif %}
@@ -263,7 +263,7 @@
     {{ event_list(project.completed, "No evidence-backed completed work is recorded.") }}
   </section>
 
-  <section class="dashboard-section" aria-labelledby="history-heading">
+  <section id="history" class="dashboard-section" aria-labelledby="history-heading">
     <div class="section-heading"><h2 id="history-heading">History and evidence</h2></div>
     <details class="history-and-evidence">
       <summary>Show recorded history and supporting evidence</summary>
@@ -277,7 +277,7 @@
           </article>
         {% endif %}
         <h3>Recorded sequence</h3>
-        {{ event_list(project.timeline, "No recorded project changes are available.") }}
+        {{ event_list(project.timeline, "No recorded project changes are available.", canonical=true) }}
         <h3>Evidence records</h3>
         {% if project.evidence_records %}
           <div class="card-grid">
